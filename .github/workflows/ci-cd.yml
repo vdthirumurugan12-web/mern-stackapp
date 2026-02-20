@@ -1,40 +1,62 @@
-name: MERN CI Pipeline
+name: MERN CI/CD Docker
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # 2️⃣ Set up Node.js
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
+      # 3️⃣ Install dependencies
       - name: Install Dependencies
         run: npm install
 
+      # 4️⃣ Optional lint step
       - name: Run Lint (optional)
         run: echo "No lint configured"
 
-      - name: Build Docker Image
-        run: docker build -t mern-backend .
+      # 5️⃣ Set up Docker Buildx (required for pushing)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
+      # 6️⃣ Log in to Docker Hub (requires secrets)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # 7️⃣ Build Docker image
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/mern-backend:latest .
+
+      # 8️⃣ Push Docker image to Docker Hub
+      - name: Push Docker Image
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mern-backend:latest
+
+      # 9️⃣ Run container for health check
       - name: Run Container
         run: |
-          docker run -d -p 5000:5000 --name test-app mern-backend
+          docker run -d -p 5000:5000 --name test-app ${{ secrets.DOCKER_HUB_USERNAME }}/mern-backend:latest
           sleep 10
 
+      # 🔟 Health check
       - name: Health Check
         run: curl --fail http://localhost:5000/health
 
+      # 1️⃣1️⃣ Stop container
       - name: Stop Container
         run: docker stop test-app
